@@ -1,5 +1,8 @@
 project(unit_tests VERSION 0.1 LANGUAGES CXX)
 
+list(APPEND CMAKE_MODULE_PATH "/home/victor/CircularBuffer/submodules/doctest.git/scripts/cmake")
+include(doctest)
+
 add_executable(unit_tests unit_tests.cpp)
 
 target_link_libraries(unit_tests INTERFACE doctest)
@@ -14,3 +17,5 @@ if (MSVC)
 else()
     target_compile_options(unit_tests PUBLIC -Wall -Wextra -pedantic -Werror)
 endif()
+
+doctest_discover_tests(unit_tests)

@@ -1,6 +1,6 @@
 project(unit_tests VERSION 0.1 LANGUAGES CXX)
 
-list(APPEND CMAKE_MODULE_PATH "/home/victor/CircularBuffer/submodules/doctest.git/scripts/cmake")
+list(APPEND CMAKE_MODULE_PATH "${circularBuffer_SOURCE_DIR}/submodules/doctest.git/scripts/cmake")
 include(doctest)
 
 add_executable(unit_tests unit_tests.cpp)

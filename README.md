@@ -1,2 +1,2 @@
 # CircularBuffer
-A preallocated FIFO circular buffer. Drop the most dated element in case of overflow
+A header-only preallocated FIFO circular buffer. Drops the most dated element in case of overflow

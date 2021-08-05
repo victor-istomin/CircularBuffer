@@ -1,0 +1,3 @@
+[submodule "submodules/doctest.git"]
+	path = submodules/doctest.git
+	url = git@github.com:onqtam/doctest.git

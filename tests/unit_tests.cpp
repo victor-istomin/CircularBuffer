@@ -9,8 +9,6 @@ TEST_CASE("tesing circular data overwriting")
 
     CHECK(ints.size() == 0);
     
-    CHECK(false);
-
     int testArray[] = { 1, 2, 3, 4, 5, 6, 7, 8, 9 };
     for(int i = 0; i < (int)std::size(testArray); ++i)
     {

@@ -13,7 +13,8 @@ target_include_directories(unit_tests PUBLIC ${DOCTEST_INCLUDE_DIR})
 
 # test using -Wall + pedantic: trying to ensure acceptable library code quality
 if (MSVC)
-    target_compile_options(unit_tests PUBLIC /W4 /WX)
+    target_compile_options(unit_tests PUBLIC /W4 /WX) 
+    target_compile_options(unit_tests PUBLIC /permissive-)
 else()
     target_compile_options(unit_tests PUBLIC -Wall -Wextra -pedantic -Werror)
 endif()

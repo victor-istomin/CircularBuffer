@@ -11,7 +11,7 @@ namespace CircularBuffer_detail
 {
     // construct std::vector-like containers
     template <typename T>
-    static T constructBuffer(int capacity)
+    static T constructBuffer(size_t capacity)
     {
         return T(capacity);
     }
@@ -46,17 +46,18 @@ class CircularBuffer
         using pointer           = PointerType;
         using reference         = decltype(*PointerType(0));
 
-        IteratorImpl(Buffer& buffer, PointerType bufferPos) 
-            : m_bufferBegin(&*std::begin(buffer))
-            , m_bufferEnd  (&*std::end(buffer))
+        IteratorImpl(PointerType bufferBegin, PointerType bufferEnd, PointerType bufferPos)
+            : m_bufferBegin(bufferBegin)
+            , m_bufferEnd  (bufferEnd)
             , m_current    (bufferPos) 
         {}
 
+        // implicit conversion of non-const iterator to const
         template <typename OtherIterator> 
         IteratorImpl(const OtherIterator& other, std::enable_if<!k_isNonConst>* /*dummy*/ = nullptr) 
             : m_bufferBegin(other.m_bufferBegin)
             , m_bufferEnd  (other.m_bufferEnd)
-            , m_current    (other.m_current)    
+            , m_current    (other.m_current)
         {
         }
 
@@ -131,10 +132,10 @@ public:
 
     bool empty() const                { return m_tail == m_head; }
 
-    iterator       begin()            { return iterator      (m_buffer, m_head); }
-    const_iterator begin()  const     { return const_iterator(const_cast<Buffer&>(m_buffer), m_head); }  // non-const buffer is needed for generic non-const iterator
-    iterator       end()              { return iterator      (m_buffer, m_tail); }
-    const_iterator end()    const     { return const_iterator(const_cast<Buffer&>(m_buffer), m_tail); }  // non-const buffer is needed for generic non-const iterator
+    iterator       begin()            { return iterator      (bufferBegin(), bufferEnd(), m_head); }
+    const_iterator begin()  const     { return const_iterator(bufferBegin(), bufferEnd(), m_head); }  // non-const buffer is needed for generic non-const iterator
+    iterator       end()              { return iterator      (bufferBegin(), bufferEnd(), m_tail); }
+    const_iterator end()    const     { return const_iterator(bufferBegin(), bufferEnd(), m_tail); }  // non-const buffer is needed for generic non-const iterator
     const_iterator cbegin() const     { return begin(); }
     const_iterator cend()   const     { return end(); }
     T&             back()             { return *std::prev(end()); } // don't prev(m_tail) because m_tail won't wrap around buffer edge
@@ -148,11 +149,11 @@ public:
         ConstPointer start = m_tail - requestedCount;
 
         // wrap if exceeded before begin of the buffer
-        int startIndex = start - bufferBegin();
+        ptrdiff_t startIndex = start - bufferBegin();
         if (startIndex < 0)
             start = bufferEnd() + startIndex;
 
-        return const_iterator(const_cast<Buffer&>(m_buffer), start);
+        return const_iterator(bufferBegin(), bufferEnd(), start);
     }
 
     template <typename Convertible>
@@ -184,8 +185,8 @@ private:
 
     ConstPointer bufferBegin() const { return & *std::begin(m_buffer); }
     Pointer      bufferBegin()       { return & *std::begin(m_buffer); }
-    ConstPointer bufferEnd() const   { return & *std::end(m_buffer); }
-    Pointer      bufferEnd()         { return & *std::end(m_buffer); }
+    ConstPointer bufferEnd() const   { return bufferBegin() + std::size(m_buffer); }
+    Pointer      bufferEnd()         { return bufferBegin() + std::size(m_buffer); }
 
     void shiftFront()
     {

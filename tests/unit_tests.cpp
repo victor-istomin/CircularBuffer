@@ -26,16 +26,16 @@ TEST_CASE("tesing circular data overwriting")
 TEST_CASE("Iteration")
 {
     int testArray[] = { 1, 2, 3, 4, 5, 6, 7, 8, 9 };
-    static constexpr int k_bufferSize = std::size(testArray) / 2;
+    static constexpr int k_bufferSize = (int)std::size(testArray) / 2;
     CircularBuffer<int> ints = CircularBuffer<int>(k_bufferSize);
 
     for(int v : testArray)
     {
         ints.pushBack(v);
 
-        const int pushedAmount = ints.size();
+        const size_t pushedAmount = ints.size();
 
-        int iteratedAmount = 0;
+		size_t iteratedAmount = 0;
         for(auto it = ints.begin(); it != ints.end(); ++it)
             ++iteratedAmount;
         CHECK(iteratedAmount == pushedAmount);
@@ -49,9 +49,9 @@ TEST_CASE("Iteration")
     for (int i = 0; i < k_bufferSize; ++i)
     {
         ints.popFront();
-        const int elementsLeft = ints.size();
+        const size_t elementsLeft = ints.size();
 
-        int iteratedAmount = 0;
+		size_t iteratedAmount = 0;
         for(auto it = ints.begin(); it != ints.end(); ++it)
             ++iteratedAmount;
         CHECK(iteratedAmount == elementsLeft);
@@ -77,7 +77,7 @@ TEST_CASE("popFront() empty buffer")
 TEST_CASE("tesing std compatibility (distance, std:size)")
 {
     int testArray[] = { 1, 2, 3, 4, 5, 6, 7 };
-    static constexpr int k_bufferSize = std::size(testArray);
+    static constexpr int k_bufferSize = (int)std::size(testArray);
     CircularBuffer<int> ints = CircularBuffer<int>(k_bufferSize);
     for (int v : testArray)
         ints.pushBack(v);
@@ -91,13 +91,13 @@ TEST_CASE("tesing std compatibility (distance, std:size)")
 TEST_CASE("CircularBuffer::mostRecent()")
 {
     int testArray[] = { 1, 2, 3, 4, 5, 6, 7, 8 };
-    static constexpr int k_bufferSize = std::size(testArray) / 2;
+    static constexpr int k_bufferSize = (int)std::size(testArray) / 2;
     static constexpr size_t k_lastCheckSize = 3;
     CircularBuffer<int> ints = CircularBuffer<int>(k_bufferSize);
 
     for (int i = 0; i < (int)std::size(testArray); ++i)
     {
-        auto clampCount = [&](int count) { return std::clamp<int>(count, 0, ints.size()); };
+        auto clampCount = [&](int count) { return std::clamp<int>(count, 0, (int)ints.size()); };
 
         CHECK(std::distance(ints.mostRecent(2 * ints.size() + 1), ints.cend()) == clampCount(i));
         CHECK(std::distance(ints.mostRecent(i), ints.cend())     == clampCount(i));
@@ -113,7 +113,7 @@ TEST_CASE("CircularBuffer::mostRecent()")
                 CHECK(*lastArrPtr == *it);   
         }
 
-        int wholeSize = ints.size();
+        size_t wholeSize = ints.size();
         CHECK(std::distance(ints.mostRecent(wholeSize),     ints.cend()) == wholeSize);
         CHECK(std::distance(ints.mostRecent(wholeSize * 2), ints.cend()) == wholeSize);
         CHECK(std::distance(ints.mostRecent(wholeSize / 2), ints.cend()) == wholeSize / 2);

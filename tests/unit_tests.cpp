@@ -35,7 +35,7 @@ TEST_CASE("Iteration")
 
         const size_t pushedAmount = ints.size();
 
-		size_t iteratedAmount = 0;
+        size_t iteratedAmount = 0;
         for(auto it = ints.begin(); it != ints.end(); ++it)
             ++iteratedAmount;
         CHECK(iteratedAmount == pushedAmount);
@@ -51,7 +51,7 @@ TEST_CASE("Iteration")
         ints.popFront();
         const size_t elementsLeft = ints.size();
 
-		size_t iteratedAmount = 0;
+        size_t iteratedAmount = 0;
         for(auto it = ints.begin(); it != ints.end(); ++it)
             ++iteratedAmount;
         CHECK(iteratedAmount == elementsLeft);

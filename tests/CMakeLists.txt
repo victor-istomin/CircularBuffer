@@ -19,4 +19,13 @@ else()
     target_compile_options(unit_tests PUBLIC -Wall -Wextra -pedantic -Werror)
 endif()
 
+# cppcheck support
+find_program(CMAKE_CXX_CPPCHECK NAMES cppcheck)
+if(CMAKE_CXX_CPPCHECK)
+    message(STATUS "cppcheck is found and will be used on the unit_tests")
+    list(APPEND CMAKE_CXX_CPPCHECK "--enable=all" )
+else()
+    message(WARNING "Could not find the program cppcheck")
+endif()
+
 doctest_discover_tests(unit_tests)

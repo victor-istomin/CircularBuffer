@@ -39,3 +39,13 @@ jobs:
       # See https://cmake.org/cmake/help/latest/manual/ctest.1.html for more detail
       run: ctest -C ${{env.BUILD_TYPE}} --output-on-failure
       
+    - name: Gather doctest JUnit results
+      working-directory: ${{github.workspace}}/build/tests
+      run: ./unit_tests --reporters=junit --out=junit-results.xml
+      
+    - name: Publish Unit Test Results
+      uses: EnricoMi/publish-unit-test-result-action@v1.19
+      if: always()
+      with:
+        files: junit-results.xml  
+      

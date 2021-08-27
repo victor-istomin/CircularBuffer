@@ -28,4 +28,8 @@ else()
     message(WARNING "Could not find the program cppcheck")
 endif()
 
+# clang-tidy support
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
+
 doctest_discover_tests(unit_tests)

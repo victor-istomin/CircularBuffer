@@ -22,13 +22,17 @@ else()
 endif()
 
 # cppcheck support
-find_program(CMAKE_CXX_CPPCHECK NAMES cppcheck)
-if(CMAKE_CXX_CPPCHECK)
-    message(STATUS "cppcheck is found and will be used on the unit_tests")
-    list(APPEND CMAKE_CXX_CPPCHECK "--enable=all" )
-else()
-    message(WARNING "Could not find the program cppcheck")
-endif()
+option(WITH_CPPCHECK "Use cppcheck" ON)
+
+if(WITH_CPPCHECK)
+    find_program(CMAKE_CXX_CPPCHECK NAMES cppcheck)
+    if(CMAKE_CXX_CPPCHECK)
+        message(STATUS "cppcheck is found and will be used on the unit_tests")
+        list(APPEND CMAKE_CXX_CPPCHECK "--enable=all" )
+    else()
+        message(WARNING "Could not find the program cppcheck")
+    endif()
+endif()  # WITH_CPPCHECK
 
 # clang-tidy support
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)

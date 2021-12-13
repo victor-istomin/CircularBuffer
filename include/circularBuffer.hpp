@@ -7,7 +7,7 @@
 #include <type_traits>
 
 
-namespace CircularBuffer_detail
+namespace detail
 {
     // construct std::vector-like containers
     template <typename T>
@@ -16,9 +16,67 @@ namespace CircularBuffer_detail
         return T(capacity);
     }
 
+    // generic adapter is not implemented, use specialization instead
+    template <class Container> class BufferAdapter;
+
+    // adds begin/end/size functions to its 'Derived' subclass 
+    // assumes that there is getUnderlyingType() method returns a reference to the underlying class that supports std::begin/end/size, 
+    // e.g. 'std::vector<T>& getUnderlyingType();'
+    template <typename Derived> struct StdFunctionsMixin
+    {
+        auto begin()        { return std::begin(static_cast<Derived*>(this)->getUnderlyingType()); }
+        auto begin() const  { return std::begin(static_cast<const Derived*>(this)->getUnderlyingType()); }
+        auto cbegin() const { return std::cbegin(static_cast<const Derived*>(this)->getUnderlyingType()); }
+
+        auto end()        { return std::end(static_cast<Derived*>(this)->getUnderlyingType()); }
+        auto end() const  { return std::end(static_cast<const Derived*>(this)->getUnderlyingType()); }
+        auto cend() const { return std::cend(static_cast<const Derived*>(this)->getUnderlyingType()); }
+
+        auto size() const { return std::size(static_cast<const Derived*>(this)->getUnderlyingType()); }
+    };
+
+    // std::vector specialization
+    template <typename... Args>
+    class BufferAdapter< std::vector<Args...> >
+        : public StdFunctionsMixin< BufferAdapter<std::vector<Args...>> >
+    {
+        using ThisType = BufferAdapter<std::vector<Args...>>;
+
+        using VectorType = std::vector<Args...>;
+        VectorType m_vector;
+
+        BufferAdapter(VectorType&& container) : m_vector(std::move(container)) { }
+
+        VectorType&       getUnderlyingType()       { return m_vector; }
+        const VectorType& getUnderlyingType() const { return m_vector; }
+        friend struct StdFunctionsMixin<ThisType>;
+
+    public:
+        static constexpr bool hasSizedMake = true;
+        static ThisType make(size_t size) { return ThisType(VectorType(size)); }
+    };
+
+    // std::array specialization
+    template <typename Type, size_t Size>
+    class BufferAdapter< std::array<Type, Size> >
+        : public StdFunctionsMixin< BufferAdapter<std::array<Type, Size>> >
+    {
+        using ThisType  = BufferAdapter< std::array<Type, Size> >;
+        using ArrayType = std::array<Type, Size + 1/*sentinel element*/>;
+        ArrayType m_array;
+
+        ArrayType&       getUnderlyingType()       { return m_array; }
+        const ArrayType& getUnderlyingType() const { return m_array; }
+        friend struct StdFunctionsMixin<ThisType>;
+
+    public:
+        static constexpr bool hasSizedMake = false;
+        static ThisType make() { return ThisType(); }
+    };
+
 }
 
-template <typename T, typename Buffer = std::vector<T>>
+template <typename T, typename ContainerType = std::vector<T>>
 class CircularBuffer
 {
     /*
@@ -43,12 +101,22 @@ public:
     using const_iterator = IteratorImpl<ConstPointer>;
     using iterator       = IteratorImpl<Pointer>;
 
-    explicit CircularBuffer(size_t capacity)
-        : m_buffer(CircularBuffer_detail::constructBuffer<Buffer>(capacity + 1/*sentinel for pushBack*/))
+    template <typename SizeType, typename T = decltype(detail::BufferAdapter<ContainerType>::make(SizeType(0)))>
+    explicit CircularBuffer(SizeType capacity)
+        : m_buffer(detail::BufferAdapter<ContainerType>::make(capacity + 1/*sentinel for pushBack*/))
         , m_head  (bufferBegin())
         , m_tail  (bufferBegin())
     {
     }
+
+    template <typename T = decltype(detail::BufferAdapter<ContainerType>::make())>
+    CircularBuffer()
+        : m_buffer(detail::BufferAdapter<ContainerType>::make())
+        , m_head(bufferBegin())
+        , m_tail(bufferBegin())
+    {
+    }
+
 
     CircularBuffer(CircularBuffer&&) = delete;         // not yet implemented
 
@@ -115,7 +183,7 @@ public:
 
 private:
 
-    Buffer  m_buffer;
+    detail::BufferAdapter<ContainerType> m_buffer;
     Pointer m_head;      // first element
     Pointer m_tail;      // past the last element, technically, may be before first because this is ring buffer
 
@@ -132,61 +200,61 @@ private:
 };
 
 
-template <typename T, typename Buffer>
+template <typename T, typename ContainerType>
 template <typename PointerType>
-class CircularBuffer<T, Buffer>::IteratorImpl
+class CircularBuffer<T, ContainerType>::IteratorImpl
 {
-	PointerType const m_bufferBegin;
-	PointerType const m_bufferEnd;
-	PointerType       m_current;
+    PointerType const m_bufferBegin;
+    PointerType const m_bufferEnd;
+    PointerType       m_current;
 
 public:
-	using iterator_category = std::bidirectional_iterator_tag;
-	using difference_type = decltype(PointerType(0) - PointerType(0));
-	using value_type = std::remove_pointer_t<PointerType>;
-	using pointer = PointerType;
-	using reference = decltype(*PointerType(0));
+    using iterator_category = std::bidirectional_iterator_tag;
+    using difference_type = decltype(PointerType(0) - PointerType(0));
+    using value_type = std::remove_pointer_t<PointerType>;
+    using pointer = PointerType;
+    using reference = decltype(*PointerType(0));
 
-	IteratorImpl(PointerType bufferBegin, PointerType bufferEnd, PointerType bufferPos)
-		: m_bufferBegin(bufferBegin)
-		, m_bufferEnd(bufferEnd)
-		, m_current(bufferPos)
-	{}
+    IteratorImpl(PointerType bufferBegin, PointerType bufferEnd, PointerType bufferPos)
+        : m_bufferBegin(bufferBegin)
+        , m_bufferEnd(bufferEnd)
+        , m_current(bufferPos)
+    {}
 
-	IteratorImpl& operator++()
-	{
-		if(++m_current == m_bufferEnd)
-			m_current = m_bufferBegin;
-		return *this;
-	}
+    IteratorImpl& operator++()
+    {
+        if(++m_current == m_bufferEnd)
+            m_current = m_bufferBegin;
+        return *this;
+    }
 
-	IteratorImpl operator++(int)
-	{
-		IteratorImpl ret = *this;
-		++(*this);
-		return ret;
-	}
+    IteratorImpl operator++(int)
+    {
+        IteratorImpl ret = *this;
+        ++(*this);
+        return ret;
+    }
 
-	IteratorImpl& operator--()
-	{
-		if(--m_current < m_bufferBegin)
-			m_current = std::prev(m_bufferEnd);
-		return *this;
-	}
+    IteratorImpl& operator--()
+    {
+        if(--m_current < m_bufferBegin)
+            m_current = std::prev(m_bufferEnd);
+        return *this;
+    }
 
-	IteratorImpl operator--(int)
-	{
-		IteratorImpl ret = *this;
-		--(*this);
-		return ret;
-	}
+    IteratorImpl operator--(int)
+    {
+        IteratorImpl ret = *this;
+        --(*this);
+        return ret;
+    }
 
-	friend bool operator==(const IteratorImpl& left, const IteratorImpl& right) { return left.m_current == right.m_current; }
-	friend bool operator!=(const IteratorImpl& left, const IteratorImpl& right) { return left.m_current != right.m_current; }
+    friend bool operator==(const IteratorImpl& left, const IteratorImpl& right) { return left.m_current == right.m_current; }
+    friend bool operator!=(const IteratorImpl& left, const IteratorImpl& right) { return left.m_current != right.m_current; }
 
-	reference operator*() const { return *m_current; }
-	pointer   operator->() const { return m_current; }
+    reference operator*() const { return *m_current; }
+    pointer   operator->() const { return m_current; }
 
-	operator IteratorImpl<ConstPointer>() const { return IteratorImpl<ConstPointer>(m_bufferBegin, m_bufferEnd, m_current); }
+    operator IteratorImpl<ConstPointer>() const { return IteratorImpl<ConstPointer>(m_bufferBegin, m_bufferEnd, m_current); }
 };
 

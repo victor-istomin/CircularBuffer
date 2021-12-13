@@ -1,5 +1,7 @@
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 #include "doctest.h"
+#include <array>
+
 #include "circularBuffer.hpp"
 
 TEST_CASE("tesing circular data overwriting")
@@ -123,4 +125,29 @@ TEST_CASE("CircularBuffer::mostRecent()")
     int* lastArrPtr = std::end(testArray) - k_lastCheckSize;
     for (auto it = ints.mostRecent(k_lastCheckSize); it != std::end(ints); ++it, ++lastArrPtr)
         CHECK(*lastArrPtr == *it);
+}
+
+TEST_CASE("std::array based")
+{
+    int testArray[] = { 1, 2, 3, 4, 5, 6, 7, 8 };
+    static constexpr int k_bufferSize = (int)std::size(testArray) / 2;
+    static constexpr size_t k_lastCheckSize = 3;
+
+    auto ints = CircularBuffer<int, std::array<int, k_bufferSize>>();
+
+    for(int v : testArray)
+        ints.pushBack(v);
+
+    CHECK(ints.size() == k_bufferSize);
+    CHECK(std::size(ints) == k_bufferSize);
+
+    CHECK(std::distance(ints.mostRecent(k_lastCheckSize), ints.cend()) == k_lastCheckSize);
+    int* lastArrPtr = &testArray[ std::size(testArray) - k_lastCheckSize ];
+    for(auto it = ints.mostRecent(k_lastCheckSize); it != std::end(ints); ++it, ++lastArrPtr)
+        CHECK(*lastArrPtr == *it);
+
+    int correctBack  = testArray[std::size(testArray) - 1];
+    int correctFront = testArray[std::size(testArray) - ints.size()];
+    CHECK(ints.back() == correctBack);
+    CHECK(ints.front() == correctFront);
 }

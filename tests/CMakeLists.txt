@@ -13,6 +13,12 @@ set(DOCTEST_INCLUDE_DIR ${circularBuffer_SOURCE_DIR}/submodules/doctest.git/doct
 target_include_directories(unit_tests PUBLIC ${DOCTEST_INCLUDE_DIR})
 doctest_discover_tests(unit_tests)
 
+# ranges support
+OPTION(WITH_CXX_20 "Use C++ 20" OFF)
+if(WITH_CXX_20)
+    target_compile_features(unit_tests PRIVATE cxx_std_20)
+endif()
+
 # test using -Wall + pedantic: trying to ensure acceptable library code quality
 if (MSVC)
     target_compile_options(unit_tests PRIVATE /W4 /WX)

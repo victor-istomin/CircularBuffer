@@ -29,15 +29,12 @@ class CircularBuffer
     using Pointer      = T*;
     using ConstPointer = const T*;
 
-    template <typename PointerType, typename FriendType = void>
+    template <typename PointerType>
     class IteratorImpl
     {
         PointerType const m_bufferBegin;
         PointerType const m_bufferEnd;
         PointerType       m_current;
-
-        static constexpr bool k_isNonConst = std::is_same_v<PointerType, Pointer>;
-        friend FriendType;
 
     public:
         using iterator_category = std::bidirectional_iterator_tag;
@@ -51,15 +48,6 @@ class CircularBuffer
             , m_bufferEnd  (bufferEnd)
             , m_current    (bufferPos) 
         {}
-
-        // implicit conversion of non-const iterator to const
-        template <typename OtherIterator> 
-        IteratorImpl(const OtherIterator& other, std::enable_if<!k_isNonConst>* /*dummy*/ = nullptr) 
-            : m_bufferBegin(other.m_bufferBegin)
-            , m_bufferEnd  (other.m_bufferEnd)
-            , m_current    (other.m_current)
-        {
-        }
 
         IteratorImpl& operator++()
         {
@@ -89,11 +77,13 @@ class CircularBuffer
             return ret;
         }
 
-        bool operator==(IteratorImpl right) const { return this->m_current == right.m_current; }
-        bool operator!=(IteratorImpl right) const { return this->m_current != right.m_current; }
+        friend bool operator==(const IteratorImpl& left, const IteratorImpl& right) { return left.m_current == right.m_current; }
+        friend bool operator!=(const IteratorImpl& left, const IteratorImpl& right) { return left.m_current != right.m_current; }
 
         reference operator*() const   { return *m_current; }
         pointer   operator->() const  { return m_current; }
+
+        operator IteratorImpl<ConstPointer>() const { return IteratorImpl<ConstPointer>(m_bufferBegin, m_bufferEnd, m_current); }
     };
 
     template <typename OtherBuffer, typename BufferIteratorType>
@@ -105,7 +95,7 @@ class CircularBuffer
 public:
 
     using const_iterator = IteratorImpl<ConstPointer>;
-    using iterator       = IteratorImpl<Pointer, const_iterator>;
+    using iterator       = IteratorImpl<Pointer>;
 
     explicit CircularBuffer(size_t capacity)
         : m_buffer(CircularBuffer_detail::constructBuffer<Buffer>(capacity + 1/*sentinel for pushBack*/))

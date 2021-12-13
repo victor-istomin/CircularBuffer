@@ -30,61 +30,7 @@ class CircularBuffer
     using ConstPointer = const T*;
 
     template <typename PointerType>
-    class IteratorImpl
-    {
-        PointerType const m_bufferBegin;
-        PointerType const m_bufferEnd;
-        PointerType       m_current;
-
-    public:
-        using iterator_category = std::bidirectional_iterator_tag;
-        using difference_type   = decltype(PointerType(0) - PointerType(0));
-        using value_type        = std::remove_pointer_t<PointerType>;
-        using pointer           = PointerType;
-        using reference         = decltype(*PointerType(0));
-
-        IteratorImpl(PointerType bufferBegin, PointerType bufferEnd, PointerType bufferPos)
-            : m_bufferBegin(bufferBegin)
-            , m_bufferEnd  (bufferEnd)
-            , m_current    (bufferPos) 
-        {}
-
-        IteratorImpl& operator++()
-        {
-            if (++m_current == m_bufferEnd)
-                m_current = m_bufferBegin;
-            return *this;
-        }
-
-        IteratorImpl operator++(int)
-        { 
-            IteratorImpl ret = *this;
-            ++(*this);
-            return ret;
-        }
-
-        IteratorImpl& operator--()
-        {
-            if (--m_current < m_bufferBegin)
-                m_current = std::prev(m_bufferEnd);
-            return *this;
-        }
-
-        IteratorImpl operator--(int)
-        {
-            IteratorImpl ret = *this;
-            --(*this);
-            return ret;
-        }
-
-        friend bool operator==(const IteratorImpl& left, const IteratorImpl& right) { return left.m_current == right.m_current; }
-        friend bool operator!=(const IteratorImpl& left, const IteratorImpl& right) { return left.m_current != right.m_current; }
-
-        reference operator*() const   { return *m_current; }
-        pointer   operator->() const  { return m_current; }
-
-        operator IteratorImpl<ConstPointer>() const { return IteratorImpl<ConstPointer>(m_bufferBegin, m_bufferEnd, m_current); }
-    };
+    class IteratorImpl;
 
     template <typename OtherBuffer, typename BufferIteratorType>
     static ptrdiff_t getIndex(const OtherBuffer& otherBufer, const BufferIteratorType foreignIterator)
@@ -183,6 +129,64 @@ private:
         if (++m_head == bufferEnd())
             m_head = bufferBegin();
     }
+};
 
+
+template <typename T, typename Buffer>
+template <typename PointerType>
+class CircularBuffer<T, Buffer>::IteratorImpl
+{
+	PointerType const m_bufferBegin;
+	PointerType const m_bufferEnd;
+	PointerType       m_current;
+
+public:
+	using iterator_category = std::bidirectional_iterator_tag;
+	using difference_type = decltype(PointerType(0) - PointerType(0));
+	using value_type = std::remove_pointer_t<PointerType>;
+	using pointer = PointerType;
+	using reference = decltype(*PointerType(0));
+
+	IteratorImpl(PointerType bufferBegin, PointerType bufferEnd, PointerType bufferPos)
+		: m_bufferBegin(bufferBegin)
+		, m_bufferEnd(bufferEnd)
+		, m_current(bufferPos)
+	{}
+
+	IteratorImpl& operator++()
+	{
+		if(++m_current == m_bufferEnd)
+			m_current = m_bufferBegin;
+		return *this;
+	}
+
+	IteratorImpl operator++(int)
+	{
+		IteratorImpl ret = *this;
+		++(*this);
+		return ret;
+	}
+
+	IteratorImpl& operator--()
+	{
+		if(--m_current < m_bufferBegin)
+			m_current = std::prev(m_bufferEnd);
+		return *this;
+	}
+
+	IteratorImpl operator--(int)
+	{
+		IteratorImpl ret = *this;
+		--(*this);
+		return ret;
+	}
+
+	friend bool operator==(const IteratorImpl& left, const IteratorImpl& right) { return left.m_current == right.m_current; }
+	friend bool operator!=(const IteratorImpl& left, const IteratorImpl& right) { return left.m_current != right.m_current; }
+
+	reference operator*() const { return *m_current; }
+	pointer   operator->() const { return m_current; }
+
+	operator IteratorImpl<ConstPointer>() const { return IteratorImpl<ConstPointer>(m_bufferBegin, m_bufferEnd, m_current); }
 };
 

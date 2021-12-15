@@ -101,7 +101,7 @@ public:
     using const_iterator = IteratorImpl<ConstPointer>;
     using iterator       = IteratorImpl<Pointer>;
 
-    template <typename SizeType, typename T = decltype(detail::BufferAdapter<ContainerType>::make(SizeType(0)))>
+    template <typename SizeType, typename Dummy = std::invoke_result<decltype(&detail::BufferAdapter<ContainerType>::make), SizeType> >
     explicit CircularBuffer(SizeType capacity)
         : m_buffer(detail::BufferAdapter<ContainerType>::make(capacity + 1/*sentinel for pushBack*/))
         , m_head  (bufferBegin())
@@ -109,8 +109,8 @@ public:
     {
     }
 
-    template <typename T = decltype(detail::BufferAdapter<ContainerType>::make())>
-    CircularBuffer()
+    template <typename Dummy = std::invoke_result<decltype(&detail::BufferAdapter<ContainerType>::make)> >
+    CircularBuffer(Dummy* = nullptr)
         : m_buffer(detail::BufferAdapter<ContainerType>::make())
         , m_head(bufferBegin())
         , m_tail(bufferBegin())

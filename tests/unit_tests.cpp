@@ -151,3 +151,105 @@ TEST_CASE("std::array based")
     CHECK(ints.back() == correctBack);
     CHECK(ints.front() == correctFront);
 }
+
+struct Trackable
+{
+    int m_value  = 0;
+    int m_copies = 0; 
+    int m_moves  = 0;
+
+    Trackable(int v = 0)              : m_value(v) {}
+    Trackable(const Trackable& other) : m_value(other.m_value), m_copies(other.m_copies + 1), m_moves(other.m_moves) {}    
+    Trackable(Trackable&& other)      : m_value(other.m_value), m_copies(other.m_copies), m_moves(other.m_moves + 1) {}
+
+    Trackable& operator=(const Trackable& other)
+    {
+        m_value  = other.m_value;
+        m_copies = other.m_copies + 1;
+        m_moves  = other.m_moves; 
+        return *this;
+    }
+
+    Trackable& operator=(Trackable&& other)
+    {
+        m_value  = other.m_value;
+        m_copies = other.m_copies;
+        m_moves  = other.m_moves + 1; 
+        return *this;
+    }
+};
+
+TEST_CASE("Trackable preconditions")
+{
+    Trackable a = 1;
+    Trackable a2 = a;
+    Trackable a3 = 3; a3 = a2;
+    CHECK(a3.m_value == 1);
+    CHECK(a3.m_copies == 2);
+    CHECK(a3.m_moves == 0);
+
+    Trackable b = 2;
+    Trackable b2 = std::move(b);
+    Trackable b3 = 0; b3 = std::move(b2);
+    CHECK(b3.m_value == 2);
+    CHECK(b3.m_copies == 0);
+    CHECK(b3.m_moves == 2);
+}
+
+TEST_CASE("Moving the items")
+{
+    constexpr size_t k_size = 3;
+    
+    // std::array is used so the buffer can't be moved and it will force items to move
+    auto movedFrom = CircularBuffer<Trackable, std::array<Trackable, k_size>>();
+
+    // no copy during the init
+    for (int i = 0; i < k_size; ++i)
+    {
+        movedFrom.pushBack(i);           // pushBack(Trackable&&) <- Trackable(int) <- i 
+        CHECK(movedFrom.back().m_value == i);
+        CHECK(movedFrom.back().m_copies == 0);
+        CHECK(movedFrom.back().m_moves == 1);
+    }
+
+    // no copy during the overwrite
+    for (int i = 0; i < k_size; ++i)
+    {
+        int value = static_cast<int>(i + k_size);
+        movedFrom.pushBack(value);                   // pushBack(Trackable&&) <- Trackable(int) <- i 
+        CHECK(movedFrom.back().m_value == value);
+        CHECK(movedFrom.back().m_copies == 0);
+        CHECK(movedFrom.back().m_moves == 1);
+    }
+
+    // no copy during the movement of non-movable buffer
+    auto movedTo = std::move(movedFrom);
+    CHECK(movedTo.front().m_value == k_size);
+    CHECK(movedTo.back().m_value == (k_size * 2 - 1));
+    for(const Trackable& t : movedTo)
+    {
+        CHECK(t.m_copies == 0);
+        CHECK(t.m_moves == 2);        
+    }
+
+    // copy counter check: movedFrom2 is a copy of movedTo -> copy occurs
+    auto movedFrom2 = movedTo;
+    CHECK(movedFrom2.front().m_value == k_size);
+    CHECK(movedFrom2.back().m_value == (k_size * 2 - 1));
+    for(const Trackable& t : movedFrom2)
+    {
+        CHECK(t.m_copies == 1);
+        CHECK(t.m_moves == 2);        
+    }
+
+    // check move assignement
+    movedTo = std::move(movedFrom2);
+    const auto& movedToRef = movedTo;    // just trying to check the const-correctness
+    CHECK(movedToRef.front().m_value == k_size);
+    CHECK(movedToRef.back().m_value == (k_size * 2 - 1));
+    for(const Trackable& t : movedToRef)
+    {
+        CHECK(t.m_copies == 1);
+        CHECK(t.m_moves == 3);        
+    }
+}

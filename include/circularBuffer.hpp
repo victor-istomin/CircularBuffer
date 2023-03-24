@@ -20,25 +20,23 @@ namespace detail
     template <class Container> class BufferAdapter;
 
     // adds begin/end/size functions to its 'Derived' subclass 
-    // assumes that there is getUnderlyingType() method returns a reference to the underlying class that supports std::begin/end/size, 
-    // e.g. 'std::vector<T>& getUnderlyingType();'
-    template <typename Derived> struct StdFunctionsMixin
+    // assumes that there is getContainer() method returns a reference to the underlying class that supports std::begin/end/size, 
+    // e.g. 'std::vector<T>& getContainer();'
+    struct StdFunctionsMixin
     {
-        auto begin()        { return std::begin(static_cast<Derived*>(this)->getUnderlyingType()); }
-        auto begin() const  { return std::begin(static_cast<const Derived*>(this)->getUnderlyingType()); }
-        auto cbegin() const { return std::cbegin(static_cast<const Derived*>(this)->getUnderlyingType()); }
+        auto begin (this auto&& self)  { return std::begin(self.getContainer()); }
+        auto cbegin(this auto&& self)  { return std::cbegin(self.getContainer()); }
 
-        auto end()        { return std::end(static_cast<Derived*>(this)->getUnderlyingType()); }
-        auto end() const  { return std::end(static_cast<const Derived*>(this)->getUnderlyingType()); }
-        auto cend() const { return std::cend(static_cast<const Derived*>(this)->getUnderlyingType()); }
+        auto end (this auto&& self)    { return std::end (self.getContainer()); }
+        auto cend(this auto&& self)    { return std::cend(self.getContainer()); }
 
-        auto size() const { return std::size(static_cast<const Derived*>(this)->getUnderlyingType()); }
+        auto size(this auto&& self)    { return std::size(self.getContainer()); }
     };
 
     // std::vector specialization
     template <typename... Args>
     class BufferAdapter< std::vector<Args...> >
-        : public StdFunctionsMixin< BufferAdapter<std::vector<Args...>> >
+        : public StdFunctionsMixin
     {
         using ThisType = BufferAdapter<std::vector<Args...>>;
 
@@ -47,9 +45,8 @@ namespace detail
 
         BufferAdapter(VectorType&& container) : m_vector(std::move(container)) { }
 
-        VectorType&       getUnderlyingType()       { return m_vector; }
-        const VectorType& getUnderlyingType() const { return m_vector; }
-        friend struct StdFunctionsMixin<ThisType>;
+        auto&& getContainer(this auto&& self)       { return self.m_vector; } 
+        friend struct StdFunctionsMixin;
 
     public:
         static constexpr bool hasSizedMake = true;
@@ -59,15 +56,14 @@ namespace detail
     // std::array specialization
     template <typename Type, size_t Size>
     class BufferAdapter< std::array<Type, Size> >
-        : public StdFunctionsMixin< BufferAdapter<std::array<Type, Size>> >
+        : public StdFunctionsMixin
     {
         using ThisType  = BufferAdapter< std::array<Type, Size> >;
         using ArrayType = std::array<Type, Size + 1/*sentinel element*/>;
         ArrayType m_array;
 
-        ArrayType&       getUnderlyingType()       { return m_array; }
-        const ArrayType& getUnderlyingType() const { return m_array; }
-        friend struct StdFunctionsMixin<ThisType>;
+        auto&& getContainer(this auto&& self)       { return self.m_array; } 
+        friend struct StdFunctionsMixin;
 
     public:
         static constexpr bool hasSizedMake = false;
@@ -117,14 +113,40 @@ public:
     {
     }
 
-
-    CircularBuffer(CircularBuffer&&) = delete;         // not yet implemented
+    CircularBuffer(CircularBuffer&& temporary)
+    {
+        // may not swap pointers, adjust head/tail using displacements
+        Displacements mine = *this;
+        Displacements their = temporary;
+        
+        std::swap(this->m_buffer, temporary.m_buffer);    
+        mine.applyTo(temporary);
+        their.applyTo(*this);
+    }
 
     CircularBuffer(const CircularBuffer& other)
         : m_buffer(other.m_buffer)
         , m_head  (bufferBegin() + getIndex(other.m_buffer, other.m_head))
         , m_tail  (bufferBegin() + getIndex(other.m_buffer, other.m_tail))
     {
+    }
+
+    CircularBuffer& operator=(CircularBuffer&& temporary)
+    {
+        // may not swap pointers, adjust head/tail using displacements
+        Displacements mine  = *this;
+        Displacements their = temporary;
+        
+        std::swap(this->m_buffer, temporary.m_buffer);    
+        mine.applyTo(temporary);
+        their.applyTo(*this);
+        return *this;
+    }
+
+    CircularBuffer& operator=(const CircularBuffer& copy)
+    {
+        CircularBuffer newBuffer = copy;   // keep me safe if it throws
+        return *this = std::move(newBuffer);
     }
 
     size_t size() const 
@@ -142,10 +164,9 @@ public:
     const_iterator end()    const     { return const_iterator(bufferBegin(), bufferEnd(), m_tail); }  // non-const buffer is needed for generic non-const iterator
     const_iterator cbegin() const     { return begin(); }
     const_iterator cend()   const     { return end(); }
-    T&             back()             { return *std::prev(end()); } // don't prev(m_tail) because m_tail won't wrap around buffer edge
-    const T&       back()   const     { return *std::prev(end()); } // don't prev(m_tail) because m_tail won't wrap around buffer edge
-    T&             front()            { return *begin(); }
-    const T&       front()   const    { return *begin(); }
+
+    auto&& back(this auto&& self)  { return *std::prev( self.end() ); }  
+    auto&& front(this auto&& self) { return *self.begin(); }  
 
     const_iterator mostRecent(size_t requestedCount) const
     { 
@@ -197,8 +218,24 @@ private:
         if (++m_head == bufferEnd())
             m_head = bufferBegin();
     }
-};
 
+    struct Displacements
+    {
+        ptrdiff_t m_head = 0;
+        ptrdiff_t m_tail = 0;
+
+        Displacements(const CircularBuffer &b)
+            : m_head(b.m_head - b.bufferBegin()), m_tail(b.m_tail - b.bufferBegin())
+        {
+        }
+
+        void applyTo(CircularBuffer &b)
+        {
+            b.m_head = b.bufferBegin() + m_head;
+            b.m_tail = b.bufferBegin() + m_tail;
+        }
+    };
+};
 
 template <typename T, typename ContainerType>
 template <typename PointerType>

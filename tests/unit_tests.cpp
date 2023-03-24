@@ -198,7 +198,7 @@ TEST_CASE("Trackable preconditions")
 
 TEST_CASE("Moving the items")
 {
-    constexpr size_t k_size = 3;
+    constexpr int k_size = 3;
     
     // std::array is used so the buffer can't be moved and it will force items to move
     auto movedFrom = CircularBuffer<Trackable, std::array<Trackable, k_size>>();

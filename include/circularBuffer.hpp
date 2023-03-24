@@ -210,8 +210,8 @@ public:
 private:
 
     detail::BufferAdapter<ContainerType> m_buffer;
-    Pointer m_head;      // first element
-    Pointer m_tail;      // past the last element, technically, may be before first because this is ring buffer
+    Pointer m_head = nullptr;      // first element
+    Pointer m_tail = nullptr;      // past the last element, technically, may be before first because this is ring buffer
 
     ConstPointer bufferBegin() const { return & *std::begin(m_buffer); }
     Pointer      bufferBegin()       { return & *std::begin(m_buffer); }

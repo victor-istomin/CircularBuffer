@@ -117,14 +117,40 @@ public:
     {
     }
 
-
-    CircularBuffer(CircularBuffer&&) = delete;         // not yet implemented
+    CircularBuffer(CircularBuffer&& temporary)
+    {
+        // may not swap pointers, adjust head/tail using displacements
+        Displacements mine = *this;
+        Displacements their = temporary;
+        
+        std::swap(this->m_buffer, temporary.m_buffer);    
+        mine.applyTo(temporary);
+        their.applyTo(*this);
+    }
 
     CircularBuffer(const CircularBuffer& other)
         : m_buffer(other.m_buffer)
         , m_head  (bufferBegin() + getIndex(other.m_buffer, other.m_head))
         , m_tail  (bufferBegin() + getIndex(other.m_buffer, other.m_tail))
     {
+    }
+
+    CircularBuffer& operator=(CircularBuffer&& temporary)
+    {
+        // may not swap pointers, adjust head/tail using displacements
+        Displacements mine  = *this;
+        Displacements their = temporary;
+        
+        std::swap(this->m_buffer, temporary.m_buffer);    
+        mine.applyTo(temporary);
+        their.applyTo(*this);
+        return *this;
+    }
+
+    CircularBuffer& operator=(const CircularBuffer& copy)
+    {
+        CircularBuffer newBuffer = copy;   // keep me safe if it throws
+        return *this = std::move(newBuffer);
     }
 
     size_t size() const 
@@ -197,8 +223,24 @@ private:
         if (++m_head == bufferEnd())
             m_head = bufferBegin();
     }
-};
 
+    struct Displacements
+    {
+        ptrdiff_t m_head = 0;
+        ptrdiff_t m_tail = 0;
+
+        Displacements(const CircularBuffer &b)
+            : m_head(b.m_head - b.bufferBegin()), m_tail(b.m_tail - b.bufferBegin())
+        {
+        }
+
+        void applyTo(CircularBuffer &b)
+        {
+            b.m_head = b.bufferBegin() + m_head;
+            b.m_tail = b.bufferBegin() + m_tail;
+        }
+    };
+};
 
 template <typename T, typename ContainerType>
 template <typename PointerType>

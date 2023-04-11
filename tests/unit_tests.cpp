@@ -1,6 +1,8 @@
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 #include "doctest.h"
 #include <array>
+#include <ranges>
+#include <algorithm>
 
 #include "circularBuffer.hpp"
 
@@ -251,5 +253,67 @@ TEST_CASE("Moving the items")
     {
         CHECK(t.m_copies == 1);
         CHECK(t.m_moves == 3);        
+    }
+}
+
+TEST_CASE("most recent")
+{
+    using Buffer = CircularBuffer<int>;
+    using Iterator = CircularBuffer<int>::iterator;
+
+    constexpr int k_size = 3;
+    Buffer buffer = Buffer(k_size);
+    std::vector<int> referenceVector;
+
+    for(int i = 0; i < k_size + 1; ++i)  // intentional overflow
+    {
+        buffer.pushBack(i);
+        referenceVector.push_back(i);
+
+        constexpr int k_requestedItems = k_size - 1;
+        const int availableItems = std::min(k_requestedItems, (int)buffer.size());
+        auto itVectorTail = referenceVector.end() - availableItems;
+        bool isTailEqual = std::equal(buffer.mostRecent(k_requestedItems), buffer.cend(), itVectorTail, referenceVector.end());
+        CHECK(isTailEqual);
+    }
+}
+
+TEST_CASE("ranges: static asserts")
+{
+    using Buffer   = CircularBuffer<int>;
+    using Iterator = CircularBuffer<int>::iterator;
+
+    static_assert(std::bidirectional_iterator<Iterator>, "CircularBuffer::iterator should satisfy the bidirectional_iterator concept");
+    static_assert(std::ranges::bidirectional_range<Buffer>, "CircularBuffer is a bidirectional_range");
+}
+
+TEST_CASE("ranges: most recent")
+{
+    using Buffer = CircularBuffer<int>;
+    using Iterator = CircularBuffer<int>::iterator;
+    namespace views = std::ranges::views;
+
+    constexpr int k_size = 3;
+    Buffer buffer = Buffer(k_size);
+    std::vector<int> referenceVector;
+
+    for (int i = 0; i < k_size + 1; ++i)  // intentional overflow
+    {
+        buffer.pushBack(i);
+        referenceVector.push_back(i);
+
+        constexpr int k_requestedItems = k_size - 1;
+        const int availableItems = std::min(k_requestedItems, (int)buffer.size());
+
+        // check that std::ranges could be used to get most recent N elements
+        auto vectorTail = referenceVector | views::reverse | views::take(availableItems) | views::reverse;
+        auto bufferTail = buffer | views::reverse | views::take(availableItems) | views::reverse;
+        bool isTailEqual = std::ranges::equal(vectorTail, bufferTail);
+        CHECK(isTailEqual);
+
+        // also check 'buffer.mostRecent' shortcut
+        auto mostRecentRange = std::ranges::subrange(buffer.mostRecent(k_requestedItems), buffer.end());
+        bool isMostRecentEqual = std::ranges::equal(vectorTail, mostRecentRange);
+        CHECK(isMostRecentEqual);
     }
 }

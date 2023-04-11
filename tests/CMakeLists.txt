@@ -14,7 +14,8 @@ target_include_directories(unit_tests PUBLIC ${DOCTEST_INCLUDE_DIR})
 doctest_discover_tests(unit_tests)
 
 # ranges support
-OPTION(WITH_CXX_20 "Use C++ 20" OFF)
+option(WITH_CXX_20 "Use C++ 20" ON)
+message(STATUS "[unit_tests] With C++ 20: ${WITH_CXX_20}")
 if(WITH_CXX_20)
     target_compile_features(unit_tests PRIVATE cxx_std_20)
 endif()
@@ -28,8 +29,8 @@ else()
 endif()
 
 # cppcheck support
-option(WITH_CPPCHECK "Use cppcheck" ON)
-
+option(WITH_CPPCHECK "Use cppcheck" OFF)
+message(STATUS "[unit_tests] Use cppcheck: ${WITH_CPPCHECK}")
 if(WITH_CPPCHECK)
     find_program(CMAKE_CXX_CPPCHECK NAMES cppcheck)
     if(CMAKE_CXX_CPPCHECK)

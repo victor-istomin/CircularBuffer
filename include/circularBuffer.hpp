@@ -7,6 +7,8 @@
 #include <type_traits>
 #include <cassert>
 
+#include <ranges>   // for subrange
+
 namespace detail
 {
     // construct std::vector-like containers
@@ -173,7 +175,7 @@ public:
     T&             front()            { return *begin(); }
     const T&       front()   const    { return *begin(); }
 
-    const_iterator mostRecent(size_t requestedCount) const
+    const_iterator findNthRecent(size_t requestedCount) const
     { 
         requestedCount = std::min(requestedCount, size());
         ConstPointer start = m_tail - requestedCount;
@@ -184,6 +186,11 @@ public:
             start = bufferEnd() + startIndex;
 
         return const_iterator(bufferBegin(), bufferEnd(), start);
+    }
+
+    auto mostRecent(size_t count) const
+    {
+        return std::ranges::subrange(findNthRecent(count), cend());
     }
 
     template <typename Convertible>

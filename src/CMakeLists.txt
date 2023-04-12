@@ -9,5 +9,5 @@ source_group(
 # We need this directory, and users of our library will need it too
 target_include_directories(circularBuffer INTERFACE ${circularBuffer_SOURCE_DIR}/include)
 
-# All users of this library will need at least C++17
-target_compile_features(circularBuffer INTERFACE cxx_std_17)
+# All users of this library will need at least C++20 because of Ranges
+target_compile_features(circularBuffer INTERFACE cxx_std_20)

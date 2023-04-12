@@ -89,7 +89,7 @@ TEST_CASE("tesing std compatibility (distance, std:size)")
     CHECK(ints.size()     == k_bufferSize);
     CHECK(std::size(ints) == k_bufferSize);
 
-    CHECK(std::distance(ints.mostRecent(2), ints.cend()) == 2);
+    CHECK(std::distance(ints.findNthRecent(2), ints.cend()) == 2);
 }
 
 TEST_CASE("CircularBuffer::mostRecent()")
@@ -103,29 +103,29 @@ TEST_CASE("CircularBuffer::mostRecent()")
     {
         auto clampCount = [&](int count) { return std::clamp<int>(count, 0, (int)ints.size()); };
 
-        CHECK(std::distance(ints.mostRecent(2 * ints.size() + 1), ints.cend()) == clampCount(i));
-        CHECK(std::distance(ints.mostRecent(i), ints.cend())     == clampCount(i));
-        CHECK(std::distance(ints.mostRecent(i + 1), ints.cend()) == clampCount(i));
-        CHECK(std::distance(ints.mostRecent(i - 1), ints.cend()) == clampCount(i - 1));
+        CHECK(std::distance(ints.findNthRecent(2 * ints.size() + 1), ints.cend()) == clampCount(i));
+        CHECK(std::distance(ints.findNthRecent(i), ints.cend())     == clampCount(i));
+        CHECK(std::distance(ints.findNthRecent(i + 1), ints.cend()) == clampCount(i));
+        CHECK(std::distance(ints.findNthRecent(i - 1), ints.cend()) == clampCount(i - 1));
 
         ints.pushBack(testArray[i]);
 
         if (ints.size() >= k_lastCheckSize)
         {
             int* lastArrPtr = &testArray[i + 1] - k_lastCheckSize;
-            for (auto it = ints.mostRecent(k_lastCheckSize); it != std::end(ints); ++it, ++lastArrPtr)
+            for (auto it = ints.findNthRecent(k_lastCheckSize); it != std::end(ints); ++it, ++lastArrPtr)
                 CHECK(*lastArrPtr == *it);   
         }
 
         size_t wholeSize = ints.size();
-        CHECK(std::distance(ints.mostRecent(wholeSize),     ints.cend()) == wholeSize);
-        CHECK(std::distance(ints.mostRecent(wholeSize * 2), ints.cend()) == wholeSize);
-        CHECK(std::distance(ints.mostRecent(wholeSize / 2), ints.cend()) == wholeSize / 2);
+        CHECK(std::distance(ints.findNthRecent(wholeSize),     ints.cend()) == wholeSize);
+        CHECK(std::distance(ints.findNthRecent(wholeSize * 2), ints.cend()) == wholeSize);
+        CHECK(std::distance(ints.findNthRecent(wholeSize / 2), ints.cend()) == wholeSize / 2);
     }
 
     CHECK(ints.size() == k_bufferSize);
     int* lastArrPtr = std::end(testArray) - k_lastCheckSize;
-    for (auto it = ints.mostRecent(k_lastCheckSize); it != std::end(ints); ++it, ++lastArrPtr)
+    for (auto it = ints.findNthRecent(k_lastCheckSize); it != std::end(ints); ++it, ++lastArrPtr)
         CHECK(*lastArrPtr == *it);
 }
 
@@ -143,9 +143,9 @@ TEST_CASE("std::array based")
     CHECK(ints.size() == k_bufferSize);
     CHECK(std::size(ints) == k_bufferSize);
 
-    CHECK(std::distance(ints.mostRecent(k_lastCheckSize), ints.cend()) == k_lastCheckSize);
+    CHECK(std::distance(ints.findNthRecent(k_lastCheckSize), ints.cend()) == k_lastCheckSize);
     int* lastArrPtr = &testArray[ std::size(testArray) - k_lastCheckSize ];
-    for(auto it = ints.mostRecent(k_lastCheckSize); it != std::end(ints); ++it, ++lastArrPtr)
+    for(auto it = ints.findNthRecent(k_lastCheckSize); it != std::end(ints); ++it, ++lastArrPtr)
         CHECK(*lastArrPtr == *it);
 
     int correctBack  = testArray[std::size(testArray) - 1];
@@ -273,8 +273,8 @@ TEST_CASE("most recent")
         constexpr int k_requestedItems = k_size - 1;
         const int availableItems = std::min(k_requestedItems, (int)buffer.size());
         auto itVectorTail = referenceVector.end() - availableItems;
-        bool isTailEqual = std::equal(buffer.mostRecent(k_requestedItems), buffer.cend(), itVectorTail, referenceVector.end());
-        CHECK(isTailEqual);
+        bool areTailEqual = std::equal(buffer.findNthRecent(k_requestedItems), buffer.cend(), itVectorTail, referenceVector.end());
+        CHECK(areTailEqual);
     }
 }
 
@@ -287,7 +287,7 @@ TEST_CASE("ranges: static asserts")
     static_assert(std::ranges::bidirectional_range<Buffer>, "CircularBuffer is a bidirectional_range");
 }
 
-TEST_CASE("ranges: most recent")
+TEST_CASE("ranges: N-th recent")
 {
     using Buffer = CircularBuffer<int>;
     using Iterator = CircularBuffer<int>::iterator;
@@ -308,12 +308,45 @@ TEST_CASE("ranges: most recent")
         // check that std::ranges could be used to get most recent N elements
         auto vectorTail = referenceVector | views::reverse | views::take(availableItems) | views::reverse;
         auto bufferTail = buffer | views::reverse | views::take(availableItems) | views::reverse;
-        bool isTailEqual = std::ranges::equal(vectorTail, bufferTail);
-        CHECK(isTailEqual);
+        bool areTailEqual = std::ranges::equal(vectorTail, bufferTail);
+        CHECK(areTailEqual);
 
         // also check 'buffer.mostRecent' shortcut
-        auto mostRecentRange = std::ranges::subrange(buffer.mostRecent(k_requestedItems), buffer.end());
-        bool isMostRecentEqual = std::ranges::equal(vectorTail, mostRecentRange);
-        CHECK(isMostRecentEqual);
+        auto mostRecentRange = std::ranges::subrange(buffer.findNthRecent(k_requestedItems), buffer.end());
+        bool areMostRecentEqual = std::ranges::equal(vectorTail, mostRecentRange);
+        CHECK(areMostRecentEqual);
     }
+}
+
+TEST_CASE("ranges: most recent")
+{
+    using Buffer = CircularBuffer<int>;
+    using Iterator = CircularBuffer<int>::iterator;
+    namespace views = std::ranges::views;
+
+    constexpr int k_size = 3;
+    constexpr int k_requestedItems = k_size - 1;
+    
+    Buffer buffer = Buffer(k_size);
+    std::vector<int> referenceVector;
+
+    for (int i = 0; i < k_size + 1; ++i)  // intentional overflow
+    {
+        buffer.pushBack(i);
+        referenceVector.push_back(i);
+
+        const int availableItems = std::min(k_requestedItems, (int)buffer.size());
+
+        // check that buffer.mostRecent() could be used to get most recent N elements
+        auto vectorTail = referenceVector | views::reverse | views::take(availableItems) | views::reverse;
+        auto mostRecentRange = buffer.mostRecent(k_requestedItems);
+        bool areMostRecentEqual = std::ranges::equal(vectorTail, mostRecentRange);
+        CHECK(areMostRecentEqual);
+    }
+
+    // check that returned range is reversible
+    auto vectorTailReversed = referenceVector | views::reverse | views::take(k_requestedItems);
+    auto mostRecentReversed = buffer.mostRecent(k_requestedItems) | views::reverse;
+    bool areReversedEqual = std::ranges::equal(vectorTailReversed, mostRecentReversed);
+    CHECK(areReversedEqual);
 }

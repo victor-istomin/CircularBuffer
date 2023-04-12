@@ -350,3 +350,28 @@ TEST_CASE("ranges: most recent")
     bool areReversedEqual = std::ranges::equal(vectorTailReversed, mostRecentReversed);
     CHECK(areReversedEqual);
 }
+
+TEST_CASE("ranges: mostRecent and rvalue")
+{
+    using Buffer = CircularBuffer<int>;
+    using Iterator = CircularBuffer<int>::iterator;
+    namespace views = std::ranges::views;
+
+    constexpr int k_size = 3;
+    constexpr int k_requestedItems = k_size - 1;
+
+    auto makeBuffer = [](int size)
+    {
+        Buffer buffer = Buffer(size);
+        for (int i = 0; i < size; ++i)
+            buffer.pushBack(i);
+        return buffer;
+    };
+
+    // this one intentionally does not compile
+    //auto mostRecent = makeBuffer(k_size).mostRecent(k_requestedItems);
+    const Buffer& buffer = makeBuffer(k_size);
+    auto mostRecent = buffer.mostRecent(k_requestedItems);
+    bool areEqual = std::ranges::equal(mostRecent, std::vector<int>{1, 2});
+    CHECK(areEqual);
+}

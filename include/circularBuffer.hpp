@@ -56,6 +56,7 @@ namespace detail
     public:
         static constexpr bool hasSizedMake = true;
         static ThisType make(size_t size) { return ThisType(VectorType(size)); }
+        BufferAdapter() = default;
     };
 
     // std::array specialization
@@ -188,10 +189,12 @@ public:
         return const_iterator(bufferBegin(), bufferEnd(), start);
     }
 
-    auto mostRecent(size_t count) const
+    auto mostRecent(size_t count) const &
     {
         return std::ranges::subrange(findNthRecent(count), cend());
     }
+
+    void mostRecent(size_t count) && = delete;                  // can't return a subrange of a temporary
 
     template <typename Convertible>
     T& pushBack(Convertible&& rvalue)

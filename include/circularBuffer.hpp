@@ -140,6 +140,9 @@ public:
 
     CircularBuffer& operator=(CircularBuffer&& temporary)
     {
+        if (this == &temporary)
+            return *this;
+
         // may not swap pointers, adjust head/tail using displacements
         Displacements mine  = *this;
         Displacements their = temporary;
@@ -152,8 +155,7 @@ public:
 
     CircularBuffer& operator=(const CircularBuffer& copy)
     {
-        CircularBuffer newBuffer = copy;   // keep me safe if it throws
-        return *this = std::move(newBuffer);
+        return this != &copy ? *this = CircularBuffer(copy) : *this; // temporary keeps me safe if constructor throws
     }
 
     size_t size() const 

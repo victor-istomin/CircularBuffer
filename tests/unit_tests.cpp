@@ -198,12 +198,13 @@ TEST_CASE("Trackable preconditions")
     CHECK(b3.m_moves == 2);
 }
 
-TEST_CASE("Moving the items")
+TEST_CASE("Copy and Move")
 {
     constexpr int k_size = 3;
-    
+    using Buffer = CircularBuffer<Trackable, std::array<Trackable, k_size>>;
+
     // std::array is used so the buffer can't be moved and it will force items to move
-    auto movedFrom = CircularBuffer<Trackable, std::array<Trackable, k_size>>();
+    Buffer movedFrom;
 
     // no copy during the init
     for (int i = 0; i < k_size; ++i)
@@ -253,6 +254,73 @@ TEST_CASE("Moving the items")
     {
         CHECK(t.m_copies == 1);
         CHECK(t.m_moves == 3);        
+    }
+
+    // check copy assignment
+    Buffer copied;
+    copied = movedTo;                   // copied to a temporary, then moved into 'copied'
+    CHECK(copied.front().m_value == k_size);
+    CHECK(copied.back().m_value == (k_size * 2 - 1));
+    for (const Trackable& t : copied)
+    {
+        CHECK(t.m_copies == 2);
+        CHECK(t.m_moves == 4);
+    }
+}
+
+TEST_CASE("Copy to self")
+{
+    constexpr size_t k_size = 3;
+    using Buffer = CircularBuffer<Trackable, std::array<Trackable, k_size>>;
+
+    // std::array is used so the buffer can't be moved and it will force items to move
+    Buffer buffer;
+
+    // no copy during the init
+    for (int i = 0; i < k_size; ++i)
+    {
+        buffer.pushBack(i);           // pushBack(Trackable&&) <- Trackable(int) <- i 
+        CHECK(buffer.back().m_value == i);
+        CHECK(buffer.back().m_copies == 0);
+        CHECK(buffer.back().m_moves == 1);
+    }
+
+    const Buffer& cref = buffer;
+    Buffer& ref = buffer;
+
+    // still no copies or moves
+    buffer = buffer = ref = cref;
+    for (const Trackable& t : buffer)
+    {
+        CHECK(t.m_copies == 0);
+        CHECK(t.m_moves == 1);
+    }
+}
+
+TEST_CASE("Move to self")
+{
+    constexpr size_t k_size = 3;
+    using Buffer = CircularBuffer<Trackable, std::array<Trackable, k_size>>;
+
+    // std::array is used so the buffer can't be moved and it will force items to move
+    Buffer buffer;
+
+    // no copy during the init
+    for (int i = 0; i < k_size; ++i)
+    {
+        buffer.pushBack(i);           // pushBack(Trackable&&) <- Trackable(int) <- i 
+        CHECK(buffer.back().m_value == i);
+        CHECK(buffer.back().m_copies == 0);
+        CHECK(buffer.back().m_moves == 1);
+    }
+
+    // still no copies or moves
+    Buffer& ref = buffer;
+    buffer = std::move(ref);
+    for (const Trackable& t : buffer)
+    {
+        CHECK(t.m_copies == 0);
+        CHECK(t.m_moves == 1);
     }
 }
 

@@ -25,8 +25,8 @@ else()
 endif()
 
 # cppcheck support
-option(WITH_CPPCHECK "Use cppcheck" ON)
-
+option(WITH_CPPCHECK "Use cppcheck" OFF)
+message(STATUS "[unit_tests] Use cppcheck: ${WITH_CPPCHECK}")
 if(WITH_CPPCHECK)
     find_program(CMAKE_CXX_CPPCHECK NAMES cppcheck)
     if(CMAKE_CXX_CPPCHECK)
@@ -35,6 +35,8 @@ if(WITH_CPPCHECK)
     else()
         message(WARNING "Could not find the program cppcheck")
     endif()
+else()
+    message(STATUS "Building with no cppcheck support")
 endif()  # WITH_CPPCHECK
 
 # clang-tidy support

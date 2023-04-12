@@ -5,7 +5,9 @@
 
 #include <cstddef>      // ptrdiff_t
 #include <type_traits>
+#include <cassert>
 
+#include <ranges>   // for subrange
 
 namespace detail
 {
@@ -51,6 +53,7 @@ namespace detail
     public:
         static constexpr bool hasSizedMake = true;
         static ThisType make(size_t size) { return ThisType(VectorType(size)); }
+        BufferAdapter() = default;
     };
 
     // std::array specialization
@@ -168,7 +171,7 @@ public:
     auto&& back(this auto&& self)  { return *std::prev( self.end() ); }  
     auto&& front(this auto&& self) { return *self.begin(); }  
 
-    const_iterator mostRecent(size_t requestedCount) const
+    const_iterator findNthRecent(size_t requestedCount) const
     { 
         requestedCount = std::min(requestedCount, size());
         ConstPointer start = m_tail - requestedCount;
@@ -180,6 +183,13 @@ public:
 
         return const_iterator(bufferBegin(), bufferEnd(), start);
     }
+
+    auto mostRecent(size_t count) const &
+    {
+        return std::ranges::subrange(findNthRecent(count), cend());
+    }
+
+    void mostRecent(size_t count) && = delete;                  // can't return a subrange of a temporary
 
     template <typename Convertible>
     T& pushBack(Convertible&& rvalue)
@@ -205,8 +215,8 @@ public:
 private:
 
     detail::BufferAdapter<ContainerType> m_buffer;
-    Pointer m_head;      // first element
-    Pointer m_tail;      // past the last element, technically, may be before first because this is ring buffer
+    Pointer m_head = nullptr;      // first element
+    Pointer m_tail = nullptr;      // past the last element, technically, may be before first because this is ring buffer
 
     ConstPointer bufferBegin() const { return & *std::begin(m_buffer); }
     Pointer      bufferBegin()       { return & *std::begin(m_buffer); }
@@ -241,16 +251,22 @@ template <typename T, typename ContainerType>
 template <typename PointerType>
 class CircularBuffer<T, ContainerType>::IteratorImpl
 {
-    PointerType const m_bufferBegin;
-    PointerType const m_bufferEnd;
-    PointerType       m_current;
+    PointerType m_bufferBegin = {};
+    PointerType m_bufferEnd   = {};
+    PointerType m_current     = {};
 
 public:
     using iterator_category = std::bidirectional_iterator_tag;
-    using difference_type = decltype(PointerType(0) - PointerType(0));
-    using value_type = std::remove_pointer_t<PointerType>;
-    using pointer = PointerType;
-    using reference = decltype(*PointerType(0));
+    using difference_type   = decltype(std::declval<PointerType>() - std::declval<PointerType>());
+    using value_type        = std::remove_pointer_t<PointerType>;
+    using pointer           = PointerType;
+    using reference         = decltype(*std::declval<PointerType>());
+
+    IteratorImpl()                    = default;   // iterator must be default-initializable for ranges compatibility
+    IteratorImpl(const IteratorImpl&) = default;
+    IteratorImpl(IteratorImpl&&)      = default;
+    IteratorImpl& operator=(const IteratorImpl&) = default;
+    IteratorImpl& operator=(IteratorImpl&&)      = default;
 
     IteratorImpl(PointerType bufferBegin, PointerType bufferEnd, PointerType bufferPos)
         : m_bufferBegin(bufferBegin)
@@ -260,6 +276,7 @@ public:
 
     IteratorImpl& operator++()
     {
+        assert(*this != IteratorImpl{});
         if(++m_current == m_bufferEnd)
             m_current = m_bufferBegin;
         return *this;
@@ -267,6 +284,7 @@ public:
 
     IteratorImpl operator++(int)
     {
+        assert(*this != IteratorImpl{});
         IteratorImpl ret = *this;
         ++(*this);
         return ret;
@@ -274,13 +292,15 @@ public:
 
     IteratorImpl& operator--()
     {
-        if(--m_current < m_bufferBegin)
+        assert(*this != IteratorImpl{});
+        if (--m_current < m_bufferBegin)
             m_current = std::prev(m_bufferEnd);
         return *this;
     }
 
     IteratorImpl operator--(int)
     {
+        assert(*this != IteratorImpl{});
         IteratorImpl ret = *this;
         --(*this);
         return ret;
@@ -289,8 +309,17 @@ public:
     friend bool operator==(const IteratorImpl& left, const IteratorImpl& right) { return left.m_current == right.m_current; }
     friend bool operator!=(const IteratorImpl& left, const IteratorImpl& right) { return left.m_current != right.m_current; }
 
-    reference operator*() const { return *m_current; }
-    pointer   operator->() const { return m_current; }
+    reference operator*()  const
+    {
+        assert(*this != IteratorImpl{});
+        return *m_current;
+    }
+
+    pointer   operator->() const
+    {
+        assert(*this != IteratorImpl{});
+        return m_current;
+    }
 
     operator IteratorImpl<ConstPointer>() const { return IteratorImpl<ConstPointer>(m_bufferBegin, m_bufferEnd, m_current); }
 };

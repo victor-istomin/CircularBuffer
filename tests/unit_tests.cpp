@@ -259,7 +259,6 @@ TEST_CASE("Moving the items")
 TEST_CASE("most recent")
 {
     using Buffer = CircularBuffer<int>;
-    using Iterator = CircularBuffer<int>::iterator;
 
     constexpr int k_size = 3;
     Buffer buffer = Buffer(k_size);
@@ -290,7 +289,6 @@ TEST_CASE("ranges: static asserts")
 TEST_CASE("ranges: N-th recent")
 {
     using Buffer = CircularBuffer<int>;
-    using Iterator = CircularBuffer<int>::iterator;
     namespace views = std::ranges::views;
 
     constexpr int k_size = 3;
@@ -321,7 +319,6 @@ TEST_CASE("ranges: N-th recent")
 TEST_CASE("ranges: most recent")
 {
     using Buffer = CircularBuffer<int>;
-    using Iterator = CircularBuffer<int>::iterator;
     namespace views = std::ranges::views;
 
     constexpr int k_size = 3;
@@ -354,7 +351,6 @@ TEST_CASE("ranges: most recent")
 TEST_CASE("ranges: mostRecent and rvalue")
 {
     using Buffer = CircularBuffer<int>;
-    using Iterator = CircularBuffer<int>::iterator;
     namespace views = std::ranges::views;
 
     constexpr int k_size = 3;

@@ -270,7 +270,7 @@ TEST_CASE("Copy and Move")
 
 TEST_CASE("Copy to self")
 {
-    constexpr size_t k_size = 3;
+    constexpr int k_size = 3;
     using Buffer = CircularBuffer<Trackable, ConstexprSizeBuffer<Trackable, k_size>>;
 
     // std::array is used so the buffer can't be moved and it will force items to move
@@ -299,7 +299,7 @@ TEST_CASE("Copy to self")
 
 TEST_CASE("Move to self")
 {
-    constexpr size_t k_size = 3;
+    constexpr int k_size = 3;
     using Buffer = CircularBuffer<Trackable, ConstexprSizeBuffer<Trackable, k_size>>;
 
     // std::array is used so the buffer can't be moved and it will force items to move

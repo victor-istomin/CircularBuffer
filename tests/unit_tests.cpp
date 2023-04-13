@@ -200,10 +200,9 @@ TEST_CASE("Trackable preconditions")
 
 TEST_CASE("Copy and Move")
 {
+	// std::array is used so the buffer can't be moved and it will force items to move
     constexpr int k_size = 3;
     using Buffer = CircularBuffer<Trackable, ConstexprSizeBuffer<Trackable, k_size>>;
-
-    // std::array is used so the buffer can't be moved and it will force items to move
     Buffer movedFrom;
 
     // no copy during the init
@@ -270,11 +269,10 @@ TEST_CASE("Copy and Move")
 
 TEST_CASE("Copy to self")
 {
-    constexpr int k_size = 3;
-    using Buffer = CircularBuffer<Trackable, ConstexprSizeBuffer<Trackable, k_size>>;
-
-    // std::array is used so the buffer can't be moved and it will force items to move
-    Buffer buffer;
+	// std::array is used so the buffer can't be moved and it will force items to move
+	constexpr int k_size = 3;
+	using Buffer = CircularBuffer<Trackable, ConstexprSizeBuffer<Trackable, k_size>>;
+	Buffer movedFrom;
 
     // no copy during the init
     for (int i = 0; i < k_size; ++i)
@@ -299,10 +297,9 @@ TEST_CASE("Copy to self")
 
 TEST_CASE("Move to self")
 {
+	// std::array is used so the buffer can't be moved and it will force items to move
     constexpr int k_size = 3;
     using Buffer = CircularBuffer<Trackable, ConstexprSizeBuffer<Trackable, k_size>>;
-
-    // std::array is used so the buffer can't be moved and it will force items to move
     Buffer buffer;
 
     // no copy during the init
@@ -432,8 +429,8 @@ TEST_CASE("ranges: mostRecent and rvalue")
         return buffer;
     };
 
-    // this one intentionally does not compile
-    //auto mostRecent = makeBuffer(k_size).mostRecent(k_requestedItems);
+    // next line intentionally does not compile
+    // auto mostRecent = makeBuffer(k_size).mostRecent(k_requestedItems);
     const Buffer& buffer = makeBuffer(k_size);
     auto mostRecent = buffer.mostRecent(k_requestedItems);
     bool areEqual = std::ranges::equal(mostRecent, std::vector<int>{1, 2});

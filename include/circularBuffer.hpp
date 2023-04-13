@@ -89,15 +89,15 @@ class CircularBuffer
         return foreignIterator - (& *std::begin(otherBufer));
     }
 
-    struct PrivateDummy {};
+    struct PrivateDummy;
 
 public:
 
     using const_iterator = IteratorImpl<ConstPointer>;
     using iterator       = IteratorImpl<Pointer>;
 
-    template <typename SizeType> 
-    requires(k_needSizeInConstructor && std::is_integral_v<SizeType>)
+    template <std::integral SizeType> 
+    requires(k_needSizeInConstructor)
     explicit CircularBuffer(SizeType capacity)
         : m_buffer(capacity)
         , m_head  (bufferBegin())
@@ -106,8 +106,8 @@ public:
     }
 
     template <typename Dummy = PrivateDummy>
-    requires(!k_needSizeInConstructor && std::is_same_v<PrivateDummy, Dummy>)
-    CircularBuffer(Dummy = PrivateDummy{})
+    requires(!k_needSizeInConstructor)
+    CircularBuffer()
         : m_buffer()
         , m_head(bufferBegin())
         , m_tail(bufferBegin())
@@ -116,7 +116,7 @@ public:
 
     CircularBuffer(CircularBuffer&& temporary)
     {
-		// may swap elements instead of pointers, thus we need to adjust head/tail using displacements
+        // may swap elements instead of pointers, thus we need to adjust head/tail using displacements
         Displacements mine = *this;
         Displacements their = temporary;
         

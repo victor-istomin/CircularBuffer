@@ -135,7 +135,7 @@ TEST_CASE("std::array based")
     static constexpr int k_bufferSize = (int)std::size(testArray) / 2;
     static constexpr size_t k_lastCheckSize = 3;
 
-    auto ints = CircularBuffer<int, std::array<int, k_bufferSize>>();
+    auto ints = CircularBuffer<int, ConstexprSizeBuffer<int, k_bufferSize>>();
 
     for(int v : testArray)
         ints.pushBack(v);
@@ -160,11 +160,11 @@ struct Trackable
     int m_copies = 0; 
     int m_moves  = 0;
 
-    Trackable(int v = 0)              : m_value(v) {}
-    Trackable(const Trackable& other) : m_value(other.m_value), m_copies(other.m_copies + 1), m_moves(other.m_moves) {}    
-    Trackable(Trackable&& other)      : m_value(other.m_value), m_copies(other.m_copies), m_moves(other.m_moves + 1) {}
+    Trackable(int v = 0)              noexcept(true) : m_value(v) {}
+    Trackable(const Trackable& other) noexcept(true) : m_value(other.m_value), m_copies(other.m_copies + 1), m_moves(other.m_moves) {}    
+    Trackable(Trackable&& other)      noexcept(true) : m_value(other.m_value), m_copies(other.m_copies), m_moves(other.m_moves + 1) {}
 
-    Trackable& operator=(const Trackable& other)
+    Trackable& operator=(const Trackable& other) noexcept(true)
     {
         m_value  = other.m_value;
         m_copies = other.m_copies + 1;
@@ -172,7 +172,7 @@ struct Trackable
         return *this;
     }
 
-    Trackable& operator=(Trackable&& other)
+    Trackable& operator=(Trackable&& other) noexcept(true)
     {
         m_value  = other.m_value;
         m_copies = other.m_copies;
@@ -201,7 +201,7 @@ TEST_CASE("Trackable preconditions")
 TEST_CASE("Copy and Move")
 {
     constexpr int k_size = 3;
-    using Buffer = CircularBuffer<Trackable, std::array<Trackable, k_size>>;
+    using Buffer = CircularBuffer<Trackable, ConstexprSizeBuffer<Trackable, k_size>>;
 
     // std::array is used so the buffer can't be moved and it will force items to move
     Buffer movedFrom;
@@ -258,20 +258,20 @@ TEST_CASE("Copy and Move")
 
     // check copy assignment
     Buffer copied;
-    copied = movedTo;                   // copied to a temporary, then moved into 'copied'
+    copied = movedTo;                   // copied to a temporary, becasue the copy constructor/assignment is noexcept(true)
     CHECK(copied.front().m_value == k_size);
     CHECK(copied.back().m_value == (k_size * 2 - 1));
     for (const Trackable& t : copied)
     {
         CHECK(t.m_copies == 2);
-        CHECK(t.m_moves == 4);
+        CHECK(t.m_moves == 3);
     }
 }
 
 TEST_CASE("Copy to self")
 {
     constexpr size_t k_size = 3;
-    using Buffer = CircularBuffer<Trackable, std::array<Trackable, k_size>>;
+    using Buffer = CircularBuffer<Trackable, ConstexprSizeBuffer<Trackable, k_size>>;
 
     // std::array is used so the buffer can't be moved and it will force items to move
     Buffer buffer;
@@ -300,7 +300,7 @@ TEST_CASE("Copy to self")
 TEST_CASE("Move to self")
 {
     constexpr size_t k_size = 3;
-    using Buffer = CircularBuffer<Trackable, std::array<Trackable, k_size>>;
+    using Buffer = CircularBuffer<Trackable, ConstexprSizeBuffer<Trackable, k_size>>;
 
     // std::array is used so the buffer can't be moved and it will force items to move
     Buffer buffer;

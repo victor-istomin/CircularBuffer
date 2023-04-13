@@ -9,77 +9,65 @@
 
 #include <ranges>   // for subrange
 
-namespace detail
+// adds begin/end/size functions to its 'Derived' subclass 
+// assumes that there is getUnderlyingType() method returns a reference to the underlying class that supports std::begin/end/size, 
+// e.g. 'std::vector<T>& getUnderlyingType();'
+// will be much easier once 'deducing this' is available
+template <typename Derived> struct StdFunctionsMixin
 {
-    // construct std::vector-like containers
-    template <typename T>
-    static T constructBuffer(size_t capacity)
-    {
-        return T(capacity);
-    }
+    auto begin() { return std::begin(static_cast<Derived*>(this)->getUnderlyingType()); }
+    auto begin() const { return std::begin(static_cast<const Derived*>(this)->getUnderlyingType()); }
+    auto cbegin() const { return std::cbegin(static_cast<const Derived*>(this)->getUnderlyingType()); }
 
-    // generic adapter is not implemented, use specialization instead
-    template <class Container> class BufferAdapter;
+    auto end() { return std::end(static_cast<Derived*>(this)->getUnderlyingType()); }
+    auto end() const { return std::end(static_cast<const Derived*>(this)->getUnderlyingType()); }
+    auto cend() const { return std::cend(static_cast<const Derived*>(this)->getUnderlyingType()); }
 
-    // adds begin/end/size functions to its 'Derived' subclass 
-    // assumes that there is getUnderlyingType() method returns a reference to the underlying class that supports std::begin/end/size, 
-    // e.g. 'std::vector<T>& getUnderlyingType();'
-    template <typename Derived> struct StdFunctionsMixin
-    {
-        auto begin()        { return std::begin(static_cast<Derived*>(this)->getUnderlyingType()); }
-        auto begin() const  { return std::begin(static_cast<const Derived*>(this)->getUnderlyingType()); }
-        auto cbegin() const { return std::cbegin(static_cast<const Derived*>(this)->getUnderlyingType()); }
+    auto size() const { return std::size(static_cast<const Derived*>(this)->getUnderlyingType()); }
+};
 
-        auto end()        { return std::end(static_cast<Derived*>(this)->getUnderlyingType()); }
-        auto end() const  { return std::end(static_cast<const Derived*>(this)->getUnderlyingType()); }
-        auto cend() const { return std::cend(static_cast<const Derived*>(this)->getUnderlyingType()); }
+template <typename Type, size_t Size>
+class ConstexprSizeBuffer
+    : public StdFunctionsMixin< ConstexprSizeBuffer<Type, Size> >
+{
+    using ArrayType = std::array<Type, Size + 1/*sentinel at the end*/>;
+    ArrayType m_array;
 
-        auto size() const { return std::size(static_cast<const Derived*>(this)->getUnderlyingType()); }
-    };
+    ArrayType& getUnderlyingType()             { return m_array; }
+    const ArrayType& getUnderlyingType() const { return m_array; }
+    friend struct StdFunctionsMixin<ConstexprSizeBuffer>;
 
-    // std::vector specialization
-    template <typename... Args>
-    class BufferAdapter< std::vector<Args...> >
-        : public StdFunctionsMixin< BufferAdapter<std::vector<Args...>> >
-    {
-        using ThisType = BufferAdapter<std::vector<Args...>>;
+public:
+    static constexpr bool k_needSizeInConstructor = false;
 
-        using VectorType = std::vector<Args...>;
-        VectorType m_vector;
+    // implicit constructors are just fine
+};
 
-        BufferAdapter(VectorType&& container) : m_vector(std::move(container)) { }
+template <typename Type>
+class VectorBuffer
+    : public StdFunctionsMixin<VectorBuffer<Type>>
+{
+    using Container = std::vector<Type>;
+    Container m_container;
 
-        VectorType&       getUnderlyingType()       { return m_vector; }
-        const VectorType& getUnderlyingType() const { return m_vector; }
-        friend struct StdFunctionsMixin<ThisType>;
+    Container& getUnderlyingType()             { return m_container; }
+    const Container& getUnderlyingType() const { return m_container; }
+    friend struct StdFunctionsMixin<VectorBuffer>;
 
-    public:
-        static constexpr bool hasSizedMake = true;
-        static ThisType make(size_t size) { return ThisType(VectorType(size)); }
-        BufferAdapter() = default;
-    };
+public:
+    static constexpr bool k_needSizeInConstructor = true;
 
-    // std::array specialization
-    template <typename Type, size_t Size>
-    class BufferAdapter< std::array<Type, Size> >
-        : public StdFunctionsMixin< BufferAdapter<std::array<Type, Size>> >
-    {
-        using ThisType  = BufferAdapter< std::array<Type, Size> >;
-        using ArrayType = std::array<Type, Size + 1/*sentinel element*/>;
-        ArrayType m_array;
+    VectorBuffer(size_t size) : m_container(size + 1) {}
+    VectorBuffer() = default;
 
-        ArrayType&       getUnderlyingType()       { return m_array; }
-        const ArrayType& getUnderlyingType() const { return m_array; }
-        friend struct StdFunctionsMixin<ThisType>;
+    // implicit constructors are just fine
+};
 
-    public:
-        static constexpr bool hasSizedMake = false;
-        static ThisType make() { return ThisType(); }
-    };
-
-}
-
-template <typename T, typename ContainerType = std::vector<T>>
+/**
+ * Constructs a ring buffer in the 'Buffer' container adapter. 
+ * It's important that the Buffer will reserve an additional sentinel element
+ */
+template <typename T, typename Buffer = VectorBuffer<T>>
 class CircularBuffer
 {
     /*
@@ -90,6 +78,8 @@ class CircularBuffer
     using Pointer      = T*;
     using ConstPointer = const T*;
 
+    static constexpr bool k_needSizeInConstructor = Buffer::k_needSizeInConstructor;
+
     template <typename PointerType>
     class IteratorImpl;
 
@@ -99,22 +89,26 @@ class CircularBuffer
         return foreignIterator - (& *std::begin(otherBufer));
     }
 
+    struct PrivateDummy {};
+
 public:
 
     using const_iterator = IteratorImpl<ConstPointer>;
     using iterator       = IteratorImpl<Pointer>;
 
-    template <typename SizeType, typename Dummy = std::invoke_result<decltype(&detail::BufferAdapter<ContainerType>::make), SizeType> >
+    template <typename SizeType> 
+    requires(k_needSizeInConstructor && std::is_integral_v<SizeType>)
     explicit CircularBuffer(SizeType capacity)
-        : m_buffer(detail::BufferAdapter<ContainerType>::make(capacity + 1/*sentinel for pushBack*/))
+        : m_buffer(capacity)
         , m_head  (bufferBegin())
         , m_tail  (bufferBegin())
     {
     }
 
-    template <typename Dummy = std::invoke_result<decltype(&detail::BufferAdapter<ContainerType>::make)> >
-    CircularBuffer(Dummy* = nullptr)
-        : m_buffer(detail::BufferAdapter<ContainerType>::make())
+    template <typename Dummy = PrivateDummy>
+    requires(!k_needSizeInConstructor && std::is_same_v<PrivateDummy, Dummy>)
+    CircularBuffer(Dummy = PrivateDummy{})
+        : m_buffer()
         , m_head(bufferBegin())
         , m_tail(bufferBegin())
     {
@@ -143,7 +137,7 @@ public:
         if (this == &temporary)
             return *this;
 
-        // may not swap pointers, adjust head/tail using displacements
+        // may swap elements instead of pointers, thus we need to adjust head/tail using displacements
         Displacements mine  = *this;
         Displacements their = temporary;
         
@@ -155,7 +149,21 @@ public:
 
     CircularBuffer& operator=(const CircularBuffer& copy)
     {
-        return this != &copy ? *this = CircularBuffer(copy) : *this; // temporary keeps me safe if constructor throws
+        if (this == &copy)
+            return *this;
+
+        if constexpr (std::is_nothrow_copy_assignable_v<Buffer>)
+        {
+            m_buffer = copy.m_buffer;
+            m_head = bufferBegin() + getIndex(copy.m_buffer, copy.m_head);
+            m_tail = bufferBegin() + getIndex(copy.m_buffer, copy.m_tail);
+        }
+        else
+        {
+            *this = CircularBuffer(copy);   // temporary keeps me safe if constructor throws
+        }
+
+        return *this; 
     }
 
     size_t size() const 
@@ -221,7 +229,7 @@ public:
 
 private:
 
-    detail::BufferAdapter<ContainerType> m_buffer;
+    Buffer  m_buffer;
     Pointer m_head = nullptr;      // first element
     Pointer m_tail = nullptr;      // past the last element, technically, may be before first because this is ring buffer
 

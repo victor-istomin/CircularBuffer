@@ -57,7 +57,7 @@ class VectorBuffer
 public:
     static constexpr bool k_needSizeInConstructor = true;
 
-    VectorBuffer(size_t size) : m_container(size + 1) {}
+    VectorBuffer(size_t size) : m_container(size + 1/*sentinel for a ring buffer*/) {}
     VectorBuffer() = default;
 
     // implicit constructors are just fine
@@ -116,7 +116,7 @@ public:
 
     CircularBuffer(CircularBuffer&& temporary)
     {
-        // may not swap pointers, adjust head/tail using displacements
+		// may swap elements instead of pointers, thus we need to adjust head/tail using displacements
         Displacements mine = *this;
         Displacements their = temporary;
         

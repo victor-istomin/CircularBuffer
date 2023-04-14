@@ -135,7 +135,7 @@ TEST_CASE("std::array based")
     static constexpr int k_bufferSize = (int)std::size(testArray) / 2;
     static constexpr size_t k_lastCheckSize = 3;
 
-    auto ints = CircularBuffer<int, ConstexprSizeBuffer<int, k_bufferSize>>();
+    CircularBuffer ints = CircularBuffer<int, ConstexprSizeBuffer<int, k_bufferSize>>();
 
     for(int v : testArray)
         ints.pushBack(v);
@@ -272,7 +272,7 @@ TEST_CASE("Copy to self")
 	// std::array is used so the buffer can't be moved and it will force items to move
 	constexpr int k_size = 3;
 	using Buffer = CircularBuffer<Trackable, ConstexprSizeBuffer<Trackable, k_size>>;
-	Buffer movedFrom;
+	Buffer buffer;
 
     // no copy during the init
     for (int i = 0; i < k_size; ++i)
